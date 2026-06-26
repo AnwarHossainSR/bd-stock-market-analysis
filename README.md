@@ -29,17 +29,20 @@ You / main Claude session  ──►  market-orchestrator  ──►  ┌─ tec
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt   # Windows
+# source .venv/bin/activate && pip install -r requirements.txt   # macOS/Linux
 ```
+All commands use the venv python explicitly so sub-agents work without activation.
 
 ## The data tool
 
 ```bash
-python tools/dse.py prices --limit 20 --sort value   # whole-market snapshot
-python tools/dse.py quote GP SQURPHARMA BEXIMCO       # specific tickers
-python tools/dse.py company GP                         # fundamentals
-python tools/dse.py index                              # breadth, top gainers/losers
-python tools/dse.py portfolio data/portfolio.csv       # your live P&L
+.venv/Scripts/python tools/dse.py prices --limit 20 --sort value   # whole-market snapshot
+.venv/Scripts/python tools/dse.py quote GP SQURPHARMA BEXIMCO       # specific tickers
+.venv/Scripts/python tools/dse.py company GP                         # fundamentals
+.venv/Scripts/python tools/dse.py index                              # breadth, top gainers/losers
+.venv/Scripts/python tools/dse.py portfolio data/portfolio.csv       # your live P&L
 ```
 
 ## Your portfolio
@@ -51,6 +54,46 @@ code,quantity,buy_price
 GP,100,260.00
 SQURPHARMA,200,210.50
 ```
+
+## Daily PDF report
+
+```bash
+.venv/Scripts/python tools/report.py --buy 6 --watch 6
+```
+
+Scans **all** DSE shares and writes a dated report to
+`reports/DSE_Analysis_YYYY-MM-DD_HHMM_BDT.pdf` containing:
+
+- **Market snapshot** — regime (bullish/bearish/mixed), advances/declines, value traded.
+- **Buy candidates** — momentum names on volume, each with P/E, dividend yield, category,
+  and an entry / stop / target plan. Flags `HIGH P/E` and weak `Cat B/N/Z`.
+- **Watchlist** — overbought spikes & volume dips to wait on, with entry conditions.
+- **Avoid / risk** — real crashers (near lower circuit) + illiquid shells.
+
+## REST API (optional)
+
+A thin FastAPI layer wraps the same scraper — handy if you want HTTP/JSON access
+(other apps, scripts, a future UI). No database; it reuses `tools/dse.py` + `report.py`.
+
+```bash
+.venv/Scripts/uvicorn api.main:app --port 8000      # or:  ./run_api.ps1
+# interactive docs:  http://localhost:8000/docs
+```
+
+Endpoints:
+
+| Method | Path | What |
+|--------|------|------|
+| GET | `/api/analysis?buy=6&watch=6&cash=36600.98&investor=B10526` | **everything in one call**: market + screen + portfolio + PDF |
+| GET | `/api/health` | liveness |
+| GET | `/api/prices` | whole market, every share tagged |
+| GET | `/api/quote?codes=GP,BEXIMCO` | specific tickers |
+| GET | `/api/company?code=GP` | fundamentals |
+| GET | `/api/index` | breadth + gainers/losers/most-active |
+| GET | `/api/overview?buy=6&watch=6` | screened BUY / WATCH / AVOID |
+| GET | `/api/portfolio` | live P&L from `data/portfolio.csv` |
+| GET | `/api/report?buy=6&watch=6&cash=36600.98&investor=B10526` | build PDF → `{url}` |
+| GET | `/reports/{file}` | download a generated PDF |
 
 ## Using the agents (inside Claude Code)
 

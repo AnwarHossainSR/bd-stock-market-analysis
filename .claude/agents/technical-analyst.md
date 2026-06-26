@@ -13,9 +13,9 @@ You are a technical analyst for the Bangladesh share market (DSE / CSE).
 
 ## Data source
 Always pull live data with the project scraper — never invent numbers:
-- Single/multiple tickers:  `python tools/dse.py quote CODE [CODE ...]`
-- Whole-market context:     `python tools/dse.py index`
-- Company 52-week range:    `python tools/dse.py company CODE`  (field `moving_range_52w`)
+- Single/multiple tickers:  `.venv/Scripts/python tools/dse.py quote CODE [CODE ...]`
+- Whole-market context:     `.venv/Scripts/python tools/dse.py index`
+- Company 52-week range:    `.venv/Scripts/python tools/dse.py company CODE`  (field `moving_range_52w`)
 
 Run from the project root. Output is JSON. If a field is `null`, say so — don't guess.
 

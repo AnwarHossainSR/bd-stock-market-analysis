@@ -13,10 +13,10 @@ You are a fundamental/equity-research analyst for the Bangladesh share market (D
 
 ## Data source
 Pull live fundamentals — never invent numbers:
-- `python tools/dse.py company CODE`   → P/E, EPS (basic), market cap, paid-up &
+- `.venv/Scripts/python tools/dse.py company CODE`   → P/E, EPS (basic), market cap, paid-up &
   authorized capital, face value, market category, listing year, 52-week range,
   dividend history, sector.
-- `python tools/dse.py quote CODE`     → current LTP for yield/valuation math.
+- `.venv/Scripts/python tools/dse.py quote CODE`     → current LTP for yield/valuation math.
 
 Run from the project root. Output is JSON; `null` means the site didn't expose it — state that rather than guessing.
 

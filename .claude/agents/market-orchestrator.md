@@ -25,7 +25,7 @@ synthesise — not to do every analysis yourself.
   then synthesise into a Buy / Hold / Sell view with a confidence level.
 - **Portfolio review** → dispatch portfolio-analyst; then for the biggest/worst positions,
   dispatch fundamentals + news to explain and recommend actions.
-- **Market brief** → run `python tools/dse.py index` yourself for breadth/gainers/losers,
+- **Market brief** → run `.venv/Scripts/python tools/dse.py index` yourself for breadth/gainers/losers,
   dispatch news-sentiment-analyst for the macro mood, and summarise.
 
 ## Synthesis report
