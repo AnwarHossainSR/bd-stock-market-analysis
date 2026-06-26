@@ -12,10 +12,12 @@ Optional focus: `$ARGUMENTS` — if a ticker given, also deep-dive it.
 
 ## Step 1 — generate the PDF report (the deliverable)
 ```
-.venv/Scripts/python tools/report.py --buy 6 --watch 6
+.venv/Scripts/python tools/report.py --buy 6 --watch 6 --investor B10526
 ```
-This scans all shares, enriches the shortlist with fundamentals, and writes
+This scans all shares, enriches the shortlist with fundamentals, includes the user's
+live portfolio P&L (from data/portfolio.csv) + a methodology page, and writes
 `reports/DSE_Analysis_YYYY-MM-DD_HHMM_BDT.pdf`. It prints the file path — capture it.
+Add `--cash <ledger balance>` to show Total Equity (e.g. `--cash 36600.98`).
 
 ## Step 2 — pull the same data for the chat brief + sanity check
 ```
