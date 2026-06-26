@@ -55,6 +55,21 @@ GP,100,260.00
 SQURPHARMA,200,210.50
 ```
 
+## Daily PDF report
+
+```bash
+.venv/Scripts/python tools/report.py --buy 6 --watch 6
+```
+
+Scans **all** DSE shares and writes a dated report to
+`reports/DSE_Analysis_YYYY-MM-DD_HHMM_BDT.pdf` containing:
+
+- **Market snapshot** — regime (bullish/bearish/mixed), advances/declines, value traded.
+- **Buy candidates** — momentum names on volume, each with P/E, dividend yield, category,
+  and an entry / stop / target plan. Flags `HIGH P/E` and weak `Cat B/N/Z`.
+- **Watchlist** — overbought spikes & volume dips to wait on, with entry conditions.
+- **Avoid / risk** — real crashers (near lower circuit) + illiquid shells.
+
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:

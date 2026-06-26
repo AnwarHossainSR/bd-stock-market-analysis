@@ -5,6 +5,8 @@ portfolio. Data is scraped from the public `dsebd.org` site (no API key, delayed
 
 ## Layout
 - `tools/dse.py` — data backbone (scraper CLI, JSON output). All agents call this.
+- `tools/report.py` — scans all shares → PDF report (buy + watchlist + conditions).
+- `reports/` — generated PDFs, named `DSE_Analysis_YYYY-MM-DD_HHMM_BDT.pdf`.
 - `.claude/agents/` — sub-agents:
   - `market-orchestrator` — coordinates full reviews (delegates to the others).
   - `technical-analyst`, `fundamentals-analyst`, `news-sentiment-analyst`, `portfolio-analyst`.
@@ -29,10 +31,17 @@ run non-interactive, no activation). Never bare `python`.
 .venv/Scripts/python tools/dse.py portfolio data/portfolio.csv       # live P&L + per-holding tag
 ```
 
+## Report generator
+```
+.venv/Scripts/python tools/report.py --buy 6 --watch 6   # -> reports/DSE_Analysis_*.pdf
+```
+Scans all shares, picks BUY + WATCHLIST with entry/stop/target + fundamentals, flags
+HIGH P/E and Cat B/N/Z risk. Prints the saved PDF path.
+
 ## /analysis command
-`.claude/commands/analysis.md` → `/analysis [TICKER]`. Runs index + screen + portfolio,
-deep-dives shortlist via fundamentals + news sub-agents, outputs a caveman daily brief
-(market / portfolio calls / buy-watch / avoid / wait / top pick).
+`.claude/commands/analysis.md` → `/analysis [TICKER]`. Generates the PDF report, then
+prints a caveman chat brief (market / buy / watchlist / avoid / top pick) + the PDF path.
+Optionally dispatches news-sentiment-analyst on top picks.
 
 ## How to orchestrate (when acting as the main session)
 - "analyse <TICKER>" → dispatch `technical-analyst` + `fundamentals-analyst` +
