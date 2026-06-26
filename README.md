@@ -70,6 +70,30 @@ Scans **all** DSE shares and writes a dated report to
 - **Watchlist** — overbought spikes & volume dips to wait on, with entry conditions.
 - **Avoid / risk** — real crashers (near lower circuit) + illiquid shells.
 
+## REST API (optional)
+
+A thin FastAPI layer wraps the same scraper — handy if you want HTTP/JSON access
+(other apps, scripts, a future UI). No database; it reuses `tools/dse.py` + `report.py`.
+
+```bash
+.venv/Scripts/uvicorn api.main:app --port 8000      # or:  ./run_api.ps1
+# interactive docs:  http://localhost:8000/docs
+```
+
+Endpoints:
+
+| Method | Path | What |
+|--------|------|------|
+| GET | `/api/health` | liveness |
+| GET | `/api/prices` | whole market, every share tagged |
+| GET | `/api/quote?codes=GP,BEXIMCO` | specific tickers |
+| GET | `/api/company?code=GP` | fundamentals |
+| GET | `/api/index` | breadth + gainers/losers/most-active |
+| GET | `/api/overview?buy=6&watch=6` | screened BUY / WATCH / AVOID |
+| GET | `/api/portfolio` | live P&L from `data/portfolio.csv` |
+| GET | `/api/report?buy=6&watch=6&cash=36600.98&investor=B10526` | build PDF → `{url}` |
+| GET | `/reports/{file}` | download a generated PDF |
+
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:

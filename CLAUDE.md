@@ -6,6 +6,7 @@ portfolio. Data is scraped from the public `dsebd.org` site (no API key, delayed
 ## Layout
 - `tools/dse.py` — data backbone (scraper CLI, JSON output). All agents call this.
 - `tools/report.py` — scans all shares → PDF report (buy + watchlist + conditions).
+- `api/` — thin FastAPI layer over `tools/` (no DB). Reuses dse + report; nothing duplicated.
 - `reports/` — generated PDFs, named `DSE_Analysis_YYYY-MM-DD_HHMM_BDT.pdf`.
 - `.claude/agents/` — sub-agents:
   - `market-orchestrator` — coordinates full reviews (delegates to the others).
@@ -37,6 +38,14 @@ run non-interactive, no activation). Never bare `python`.
 ```
 Scans all shares, picks BUY + WATCHLIST with entry/stop/target + fundamentals, flags
 HIGH P/E and Cat B/N/Z risk. Prints the saved PDF path.
+
+## REST API (optional HTTP layer)
+```
+.venv/Scripts/uvicorn api.main:app --port 8000     # or: ./run_api.ps1   ; docs at /docs
+```
+Read-only endpoints reuse `tools/`: `GET /api/health|prices|quote?codes=|company?code=|
+index|overview?buy=&watch=|portfolio`, `GET /api/report?buy=&watch=&cash=&investor=` (→ PDF url),
+`GET /reports/{file}`. No DB; portfolio still from `data/portfolio.csv`.
 
 ## /analysis command
 `.claude/commands/analysis.md` → `/analysis [TICKER]`. Generates the PDF report, then
