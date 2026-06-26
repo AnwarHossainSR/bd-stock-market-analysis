@@ -13,7 +13,7 @@ You are a news & sentiment analyst for the Bangladesh share market (DSE / CSE).
 
 ## How to research
 1. Identify the full company name from the ticker if needed:
-   `python tools/dse.py company CODE` (sector helps disambiguate).
+   `.venv/Scripts/python tools/dse.py company CODE` (sector helps disambiguate).
 2. Use **WebSearch** for recent, dated items. Good queries:
    - "<Company name> DSE news 2026"
    - "<Company name> dividend / earnings / AGM announcement"

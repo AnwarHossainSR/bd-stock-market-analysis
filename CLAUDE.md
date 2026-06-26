@@ -11,20 +11,34 @@ portfolio. Data is scraped from the public `dsebd.org` site (no API key, delayed
 - `data/portfolio.csv` — the user's holdings (`code,quantity,buy_price`).
 - `data/cache/` — short-TTL HTML cache (safe to delete).
 
+## Output style
+This project **always responds in caveman mode** (full). Terse, drop articles/filler,
+fragments OK, keep tickers + numbers + code exact.
+
+## Python env
+Deps live in project venv `.venv`. **Always** call `.venv/Scripts/python` (sub-agents
+run non-interactive, no activation). Never bare `python`.
+
 ## The data tool (run from project root)
 ```
-python tools/dse.py prices --limit 20 --sort value   # market snapshot
-python tools/dse.py quote GP SQURPHARMA               # specific tickers
-python tools/dse.py company GP                         # fundamentals
-python tools/dse.py index                              # breadth, gainers/losers
-python tools/dse.py portfolio data/portfolio.csv       # live P&L
+.venv/Scripts/python tools/dse.py prices --limit 20 --sort value   # market snapshot
+.venv/Scripts/python tools/dse.py quote GP SQURPHARMA               # specific tickers
+.venv/Scripts/python tools/dse.py company GP                         # fundamentals
+.venv/Scripts/python tools/dse.py index                              # breadth, gainers/losers
+.venv/Scripts/python tools/dse.py screen --limit 15                  # BUY/HOLD/WAIT/AVOID tags
+.venv/Scripts/python tools/dse.py portfolio data/portfolio.csv       # live P&L + per-holding tag
 ```
+
+## /analysis command
+`.claude/commands/analysis.md` → `/analysis [TICKER]`. Runs index + screen + portfolio,
+deep-dives shortlist via fundamentals + news sub-agents, outputs a caveman daily brief
+(market / portfolio calls / buy-watch / avoid / wait / top pick).
 
 ## How to orchestrate (when acting as the main session)
 - "analyse <TICKER>" → dispatch `technical-analyst` + `fundamentals-analyst` +
   `news-sentiment-analyst` in parallel, then synthesise Buy/Hold/Sell.
 - "review my portfolio" → `portfolio-analyst`, then drill into worst/biggest names.
-- "market brief" → `python tools/dse.py index` + `news-sentiment-analyst`.
+- "market brief" → `.venv/Scripts/python tools/dse.py index` + `news-sentiment-analyst`.
 - For a one-shot full review, the user can invoke the `market-orchestrator` agent.
 
 ## Rules for every agent

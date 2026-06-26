@@ -29,17 +29,20 @@ You / main Claude session  ──►  market-orchestrator  ──►  ┌─ tec
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt   # Windows
+# source .venv/bin/activate && pip install -r requirements.txt   # macOS/Linux
 ```
+All commands use the venv python explicitly so sub-agents work without activation.
 
 ## The data tool
 
 ```bash
-python tools/dse.py prices --limit 20 --sort value   # whole-market snapshot
-python tools/dse.py quote GP SQURPHARMA BEXIMCO       # specific tickers
-python tools/dse.py company GP                         # fundamentals
-python tools/dse.py index                              # breadth, top gainers/losers
-python tools/dse.py portfolio data/portfolio.csv       # your live P&L
+.venv/Scripts/python tools/dse.py prices --limit 20 --sort value   # whole-market snapshot
+.venv/Scripts/python tools/dse.py quote GP SQURPHARMA BEXIMCO       # specific tickers
+.venv/Scripts/python tools/dse.py company GP                         # fundamentals
+.venv/Scripts/python tools/dse.py index                              # breadth, top gainers/losers
+.venv/Scripts/python tools/dse.py portfolio data/portfolio.csv       # your live P&L
 ```
 
 ## Your portfolio

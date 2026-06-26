@@ -252,6 +252,66 @@ def cmd_index(args):
 
 
 # --------------------------------------------------------------------------- #
+# Daily screener — rule-based BUY / HOLD / WAIT / AVOID tags (price/volume only)
+# --------------------------------------------------------------------------- #
+def _rate(r: dict):
+    """Transparent technical screen. Returns (tag, reason). NOT advice."""
+    ltp, ycp, high, low = r.get("ltp"), r.get("ycp"), r.get("high"), r.get("low")
+    val = r.get("value_mn") or 0
+    if ltp is None or not ycp:
+        return "NO-DATA", "no price"
+    pct = (ltp - ycp) / ycp * 100
+    if val < 0.5:
+        return "AVOID", f"illiquid ({val:.2f}mn traded) — hard exit"
+    if pct <= -7:
+        return "AVOID", f"crash {pct:.1f}% — falling knife / near lower circuit"
+    if pct >= 7:
+        return "WAIT", f"spike {pct:.1f}% — overbought / near upper circuit, don't chase"
+    pos = (ltp - low) / (high - low) if (high and low and high > low) else None
+    if 1.5 <= pct < 7 and val >= 3 and (pos is None or pos >= 0.6):
+        return "BUY-WATCH", f"+{pct:.1f}% on {val:.1f}mn vol, closing strong"
+    if -7 < pct <= -2 and val >= 3:
+        return "WATCH-DIP", f"{pct:.1f}% dip on volume — watch for support"
+    if -2 < pct < 1.5:
+        return "HOLD", f"stable {pct:+.1f}%"
+    return "NEUTRAL", f"{pct:+.1f}%"
+
+
+def cmd_screen(args):
+    rows = get_prices()
+    rated = []
+    for r in rows:
+        tag, reason = _rate(r)
+        rated.append({
+            "code": r["code"], "ltp": r["ltp"], "pct_change": _pct_change(r),
+            "value_mn": r["value_mn"], "tag": tag, "reason": reason,
+        })
+    adv = sum(1 for x in rated if (x["pct_change"] or 0) > 0)
+    dec = sum(1 for x in rated if (x["pct_change"] or 0) < 0)
+    regime = "bullish" if adv > dec * 1.5 else "bearish" if dec > adv * 1.5 else "mixed"
+
+    def bucket(tag, key, rev, n):
+        xs = [x for x in rated if x["tag"] == tag]
+        xs.sort(key=lambda x: x.get(key) or 0, reverse=rev)
+        return xs[:n]
+
+    counts = {}
+    for x in rated:
+        counts[x["tag"]] = counts.get(x["tag"], 0) + 1
+    return {
+        "source": "DSE", "fetched_at": _now(),
+        "market_regime": regime,
+        "breadth": {"advances": adv, "declines": dec, "total": len(rated)},
+        "counts": counts,
+        "buy_watch": bucket("BUY-WATCH", "value_mn", True, args.limit),
+        "watch_dip": bucket("WATCH-DIP", "value_mn", True, args.limit),
+        "wait_overbought": bucket("WAIT", "pct_change", True, args.limit),
+        "avoid": bucket("AVOID", "pct_change", False, args.limit),
+        "note": "Rule-based price/volume screen only — confirm with fundamentals + news. NOT financial advice.",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Portfolio P&L
 # --------------------------------------------------------------------------- #
 def cmd_portfolio(args):
@@ -287,6 +347,8 @@ def cmd_portfolio(args):
             "unrealized_pnl": round(pnl, 2) if pnl is not None else None,
             "pnl_pct": round(pnl / cost * 100, 2) if pnl is not None and cost else None,
             "day_change_pct": _pct_change(r) if r else None,
+            "tag": (_rate(r)[0] if r else "NO-DATA"),
+            "tag_reason": (_rate(r)[1] if r else "not trading today"),
         })
     return {
         "source": "DSE",
@@ -324,6 +386,10 @@ def main():
 
     si = sub.add_parser("index", help="market breadth summary")
     si.set_defaults(func=cmd_index)
+
+    ss = sub.add_parser("screen", help="rule-based BUY/HOLD/WAIT/AVOID screen")
+    ss.add_argument("--limit", type=int, default=15)
+    ss.set_defaults(func=cmd_screen)
 
     spf = sub.add_parser("portfolio", help="portfolio P&L from CSV")
     spf.add_argument("csv", nargs="?", default="data/portfolio.csv")
