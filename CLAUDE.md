@@ -43,9 +43,11 @@ HIGH P/E and Cat B/N/Z risk. Prints the saved PDF path.
 ```
 .venv/Scripts/uvicorn api.main:app --port 8000     # or: ./run_api.ps1   ; docs at /docs
 ```
-Read-only endpoints reuse `tools/`: `GET /api/health|prices|quote?codes=|company?code=|
-index|overview?buy=&watch=|portfolio`, `GET /api/report?buy=&watch=&cash=&investor=` (→ PDF url),
-`GET /reports/{file}`. No DB; portfolio still from `data/portfolio.csv`.
+All-in-one: `GET /api/analysis?buy=&watch=&cash=&investor=&pdf=true` → market + screen
+(buy/watch/avoid) + portfolio P&L + PDF url in one response (mirrors the `/analysis` chain).
+Granular endpoints reuse `tools/`: `GET /api/health|prices|quote?codes=|company?code=|
+index|overview?buy=&watch=|portfolio`, `GET /api/report?...` (→ PDF url), `GET /reports/{file}`.
+No DB; portfolio still from `data/portfolio.csv`.
 
 ## /analysis command
 `.claude/commands/analysis.md` → `/analysis [TICKER]`. Generates the PDF report, then

@@ -84,6 +84,7 @@ Endpoints:
 
 | Method | Path | What |
 |--------|------|------|
+| GET | `/api/analysis?buy=6&watch=6&cash=36600.98&investor=B10526` | **everything in one call**: market + screen + portfolio + PDF |
 | GET | `/api/health` | liveness |
 | GET | `/api/prices` | whole market, every share tagged |
 | GET | `/api/quote?codes=GP,BEXIMCO` | specific tickers |
