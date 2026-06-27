@@ -48,6 +48,21 @@ def init_db(db_path=None) -> None:
             )"""
         )
         con.execute("CREATE INDEX IF NOT EXISTS ix_code_date ON prices(code, date)")
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS intraday_prices(
+                ts TEXT,
+                code TEXT,
+                ltp REAL,
+                high REAL,
+                low REAL,
+                ycp REAL,
+                volume REAL,
+                value_mn REAL,
+                trades REAL,
+                PRIMARY KEY(ts, code)
+            )"""
+        )
+        con.execute("CREATE INDEX IF NOT EXISTS ix_intraday_code_ts ON intraday_prices(code, ts)")
 
 
 def upsert_prices(rows: list[dict], db_path=None) -> int:

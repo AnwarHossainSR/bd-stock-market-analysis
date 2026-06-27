@@ -5,3 +5,8 @@ __pycache__/
 /reports/*
 /data/portfolio.csv
 data/*.db
+node_modules/
+client/node_modules/
+client/dist/
+.pytest_tmp/
+.runtime/

@@ -4,7 +4,7 @@ import os
 import report
 
 
-def test_build_pdf_with_history(monkeypatch):
+def test_build_pdf_with_history(monkeypatch, tmp_path):
     hist = [
         {
             "date": f"d{i}",
@@ -51,6 +51,7 @@ def test_build_pdf_with_history(monkeypatch):
         },
     )
     monkeypatch.setattr(report, "load_portfolio", lambda p: None)
+    monkeypatch.setattr(report, "REPORTS_DIR", str(tmp_path))
     p = report.build_pdf(report.select(6, 6), None, datetime(2026, 6, 26, 17, 0))
     assert p.endswith(".pdf")
     assert os.path.getsize(p) > 5000

@@ -11,7 +11,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import analysis, insights, market, portfolio, reports
+from api.routers import analysis, insights, market, portfolio, reports, session_dashboard
 
 app = FastAPI(
     title="DSE Scraper API",
@@ -38,3 +38,4 @@ app.include_router(insights.router)
 app.include_router(market.router)
 app.include_router(portfolio.router)
 app.include_router(reports.router)
+app.include_router(session_dashboard.router)

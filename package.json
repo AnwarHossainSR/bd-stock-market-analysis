@@ -1,0 +1,14 @@
+{
+  "name": "market-analysis-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "dev:api": ".venv/Scripts/uvicorn api.main:app --port 8000 --reload",
+    "dev:client": "powershell -ExecutionPolicy Bypass -File scripts/client.ps1 dev",
+    "build": "powershell -ExecutionPolicy Bypass -File scripts/client.ps1 build",
+    "test": ".venv/Scripts/python -m pytest --basetemp .pytest_tmp && powershell -ExecutionPolicy Bypass -File scripts/client.ps1 test",
+    "test:api": ".venv/Scripts/python -m pytest --basetemp .pytest_tmp",
+    "test:client": "powershell -ExecutionPolicy Bypass -File scripts/client.ps1 test"
+  }
+}

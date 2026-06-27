@@ -17,8 +17,9 @@ PATT = {"bias": "BULLISH"}
 def test_strong_buy():
     r = {"value_mn": 50, "ltp": 100, "ycp": 98}
     out = score.composite(r, IND_UP, PATT, 75)
-    assert out["signal"] in ("BUY", "WATCH")
+    assert out["signal"] in ("BUY-WATCH", "ENTRY ZONE", "WAIT FOR DIP")
     assert out["score"] >= 60
+    assert out["sub_scores"]["technical"] >= 60
 
 
 def test_illiquid_is_avoid():

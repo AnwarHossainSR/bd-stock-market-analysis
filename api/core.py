@@ -24,6 +24,12 @@ import score  # noqa: E402
 import backtest  # noqa: E402
 import snapshot  # noqa: E402
 import history  # noqa: E402
+import session  # noqa: E402
+import portfolio_actions  # noqa: E402
+import alerts  # noqa: E402
+import intraday  # noqa: E402
+import health  # noqa: E402
+import analysis_runs  # noqa: E402
 
 REPORTS_DIR = os.path.join(ROOT, "reports")
 PORTFOLIO_CSV = os.path.join(ROOT, "data", "portfolio.csv")
@@ -39,6 +45,12 @@ __all__ = [
     "backtest",
     "snapshot",
     "history",
+    "session",
+    "portfolio_actions",
+    "alerts",
+    "intraday",
+    "health",
+    "analysis_runs",
     "ROOT",
     "REPORTS_DIR",
     "PORTFOLIO_CSV",
