@@ -70,6 +70,28 @@ Scans **all** DSE shares and writes a dated report to
 - **Watchlist** — overbought spikes & volume dips to wait on, with entry conditions.
 - **Avoid / risk** — real crashers (near lower circuit) + illiquid shells.
 
+## Accuracy engine
+
+The screener can use stored OHLC history in `data/dse.db` for technical indicators,
+chart-pattern reads, composite scoring, and walk-forward backtest validation.
+
+Backfill once:
+
+```bash
+.venv/Scripts/python tools/history.py --all --start 2023-01-01
+```
+
+Refresh daily after EOD:
+
+```bash
+.venv/Scripts/python tools/refresh.py
+```
+
+This captures the latest live snapshot into SQLite and writes `reports/backtest.json`,
+which the PDF includes when present. The score combines trend, RSI, moving averages,
+volume ratio, support/resistance, fundamentals, liquidity, and hard risk gates. It is
+a quantitative aid, not a prediction.
+
 ## REST API (optional)
 
 A thin FastAPI layer wraps the same scraper — handy if you want HTTP/JSON access
@@ -95,6 +117,19 @@ Endpoints:
 | GET | `/api/report?buy=6&watch=6&cash=36600.98&investor=B10526` | build PDF → `{url}` |
 | GET | `/reports/{file}` | download a generated PDF |
 
+Additional insight endpoints:
+
+| Method | Path | What |
+|--------|------|------|
+| GET | `/api/history?code=GP&days=420` | stored OHLC history |
+| GET | `/api/indicators?code=GP` | SMA/RSI/volatility/ATR/trend metrics |
+| GET | `/api/patterns?code=GP` | support/resistance + chart-pattern read |
+| GET | `/api/score?code=GP` | composite score for one share |
+| GET | `/api/score?limit=10` | ranked scored market from stored history |
+| GET | `/api/backtest?horizon=20&code=GP` | walk-forward signal validation |
+| POST | `/api/snapshot/capture` | capture live snapshot into SQLite |
+| POST | `/api/history/backfill?code=GP&start=2023-01-01` | backfill one code |
+
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:
@@ -106,6 +141,8 @@ Just ask in natural language and the orchestrator routes the work, e.g.:
 
 ## Notes / limitations
 
+- Indicators need stored history. Run `tools/history.py` once, then `tools/refresh.py`
+  daily. Outputs remain educational only, NOT financial advice.
 - `dsebd.org` ships an incomplete TLS chain; `dse.py` falls back to an unverified
   connection (public data only, no credentials). Set `DSE_INSECURE=0` to force strict TLS.
 - Only DSE is wired up; CSE could be added the same way.

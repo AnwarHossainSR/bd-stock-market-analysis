@@ -15,7 +15,8 @@ Optional focus: `$ARGUMENTS` — if a ticker given, also deep-dive it.
 .venv/Scripts/python tools/report.py --buy 6 --watch 6 --investor B10526
 ```
 This scans all shares, enriches the shortlist with fundamentals, includes the user's
-live portfolio P&L (from data/portfolio.csv) + a methodology page, and writes
+live portfolio P&L (from data/portfolio.csv), score/pattern reads, embedded charts,
+cached backtest validation when `reports/backtest.json` exists, and a methodology page. It writes
 `reports/DSE_Analysis_YYYY-MM-DD_HHMM_BDT.pdf`. It prints the file path — capture it.
 Add `--cash <ledger balance>` to show Total Equity (e.g. `--cash 36600.98`).
 
@@ -25,6 +26,8 @@ Add `--cash <ledger balance>` to show Total Equity (e.g. `--cash 36600.98`).
 .venv/Scripts/python tools/dse.py index
 ```
 If `$ARGUMENTS` is a ticker: `.venv/Scripts/python tools/dse.py company $ARGUMENTS` and `... quote $ARGUMENTS`.
+If stored history is available, `/api/score` and the PDF include composite score, signal,
+technical/fundamental breakdown, and chart-pattern summary.
 Use ONLY numbers these return. `null` = unavailable, say so. Never invent.
 
 ## Step 3 — (optional) news on top picks
