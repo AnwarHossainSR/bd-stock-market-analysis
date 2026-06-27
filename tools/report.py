@@ -332,6 +332,11 @@ def pnl_color(v):
 # --------------------------------------------------------------------------- #
 # Sections
 # --------------------------------------------------------------------------- #
+def ensure_space(pdf, needed=35):
+    if pdf.get_y() + needed > pdf.h - pdf.b_margin:
+        pdf.add_page()
+
+
 def _pdf_image(pdf, path, x=None, y=None, w=0, h=0):
     try:
         pdf.image(path, x=x, y=y, w=w, h=h)
@@ -349,11 +354,12 @@ def market_charts_section(pdf, data, tmpdir):
         sector = charts.sector_pie(sectors or {"No candidates": 1}, os.path.join(tmpdir, "sectors.png"))
     except Exception:
         return
+    ensure_space(pdf, 50)
     section(pdf, "MARKET BREADTH & CANDIDATE MIX", NAVY2)
     y = pdf.get_y()
-    if _pdf_image(pdf, breadth, x=pdf.l_margin, y=y, w=82):
-        _pdf_image(pdf, sector, x=pdf.l_margin + 96, y=y - 3, w=72)
-        pdf.set_y(y + 58)
+    if _pdf_image(pdf, breadth, x=pdf.l_margin, y=y, w=68):
+        _pdf_image(pdf, sector, x=pdf.l_margin + 84, y=y - 2, w=48)
+        pdf.set_y(y + 43)
 
 
 def cover(pdf, data, port, investor, cash):
@@ -431,11 +437,10 @@ def portfolio_section(pdf, port, cash, tmpdir=None):
     if tmpdir:
         try:
             alloc = charts.portfolio_alloc(port["positions"], os.path.join(tmpdir, "portfolio.png"))
-            if pdf.get_y() > 215:
-                pdf.add_page()
+            ensure_space(pdf, 58)
             y = pdf.get_y() + 3
-            _pdf_image(pdf, alloc, x=pdf.l_margin, y=y, w=70)
-            pdf.set_xy(pdf.l_margin + 78, y + 2)
+            _pdf_image(pdf, alloc, x=pdf.l_margin, y=y, w=52)
+            pdf.set_xy(pdf.l_margin + 62, y + 2)
             pdf.set_font("Helvetica", "B", 8)
             pdf.set_text_color(*NAVY)
             pdf.cell(0, 5, "Portfolio analytics", new_x="LMARGIN", new_y="NEXT")
@@ -446,9 +451,9 @@ def portfolio_section(pdf, port, cash, tmpdir=None):
                 f"Expected dividend income: Tk {money(analytics['dividend_income'])}",
             ] + analytics["notes"]
             for line in lines:
-                pdf.set_x(pdf.l_margin + 78)
+                pdf.set_x(pdf.l_margin + 62)
                 pdf.multi_cell(0, 5, S(line), new_x="LMARGIN", new_y="NEXT")
-            pdf.set_y(max(pdf.get_y(), y + 72))
+            pdf.set_y(max(pdf.get_y(), y + 50))
         except Exception:
             pass
 
@@ -493,9 +498,8 @@ def candidate_block(pdf, i, r, kind, tmpdir=None):
     if tmpdir and r.get("history"):
         try:
             png = charts.price_chart(r["history"], r.get("indicators") or {}, os.path.join(tmpdir, f"{r['code']}_{i}.png"))
-            if pdf.get_y() > 205:
-                pdf.add_page()
-            _pdf_image(pdf, png, w=120)
+            ensure_space(pdf, 45)
+            _pdf_image(pdf, png, w=95)
             pdf.ln(1)
         except Exception:
             pass
@@ -528,7 +532,7 @@ def avoid_section(pdf, avoid):
 
 
 def methodology(pdf):
-    pdf.add_page()
+    ensure_space(pdf, 90)
     section(pdf, "HOW SHARES ARE PICKED  (methodology)", NAVY2)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(40, 45, 50)
@@ -577,7 +581,7 @@ def backtest_section(pdf):
             data = json.load(f)
     except Exception:
         return
-    pdf.add_page()
+    ensure_space(pdf, 55)
     section(pdf, "BACKTEST VALIDATION", NAVY2)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(40, 45, 50)
