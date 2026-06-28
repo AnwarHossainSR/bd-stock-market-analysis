@@ -42,6 +42,14 @@ def test_build_pdf_with_history(monkeypatch):
                     "technical": 70,
                     "fundamental": 75,
                     "pattern_summary": "Bullish: uptrend; golden cross.",
+                    "prediction": {
+                        "label": "BULLISH_BIAS",
+                        "probability_pct": 56,
+                        "confidence": "MEDIUM",
+                        "horizon": "next 1-5 sessions",
+                        "candle": {"label": "BULLISH_CANDLE", "summary": "green candle with constructive close"},
+                        "explanation": ["candle: green candle with constructive close", "trend UP"],
+                    },
                     "indicators": {"trend": "UP"},
                     "history": hist,
                 }

@@ -32,6 +32,7 @@ import charts
 import fundamentals
 import indicators
 import patterns
+import prediction
 import score
 import store
 
@@ -105,6 +106,7 @@ def enrich(row):
     out["technical"] = None
     out["fundamental"] = None
     out["pattern_summary"] = None
+    out["prediction"] = None
     out["indicators"] = {}
     out["history"] = []
 
@@ -131,10 +133,13 @@ def enrich(row):
             comp = score.composite(out, ic, pt, fscore)
             out.update(comp)
             out["pattern_summary"] = pt["summary"]
+            out["prediction"] = prediction.predict(out, h, ic, pt)
             out["indicators"] = ic
             out["history"] = h
+        else:
+            out["prediction"] = prediction.predict(out, [], {}, {})
     except Exception:
-        pass
+        out["prediction"] = prediction.predict(out, [], {}, {})
     return out
 
 
@@ -507,6 +512,30 @@ def candidate_block(pdf, i, r, kind, tmpdir=None):
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(40, 45, 50)
         pdf.multi_cell(0, 4.6, S(f"Pattern: {r['pattern_summary']}"), new_x="LMARGIN", new_y="NEXT")
+    if r.get("prediction"):
+        pred = r["prediction"]
+        candle = pred.get("candle") or {}
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*AMBER)
+        pdf.multi_cell(
+            0,
+            4.6,
+            S(
+                f"Prediction: {pred.get('label')} ({pred.get('probability_pct')}%, "
+                f"{pred.get('confidence')} confidence, {pred.get('horizon')})"
+            ),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(40, 45, 50)
+        pdf.multi_cell(
+            0,
+            4.6,
+            S(f"Candle: {candle.get('summary', '-')} | Why: {'; '.join(pred.get('explanation', [])[:4])}"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
     pdf.set_text_color(*NAVY)
     if kind == "buy":
         plan = (f"Plan: entry on dip {num(lv['support'])} or break above {num(lv['resistance'])}.  "
@@ -529,6 +558,57 @@ def avoid_section(pdf, avoid):
         chg = "no trade" if (r.get("value_mn") or 0) < 0.5 else f"{(r.get('pct') or 0):+.1f}%"
         rows.append([r["code"], (chg, pnl_color(r.get("pct"))), r.get("reason", "")])
     table(pdf, headers, widths, ["L", "R", "L"], rows)
+
+
+def prediction_section(pdf, data):
+    picks = [r for r in data.get("buy", []) + data.get("watch", []) if r.get("prediction")]
+    if not picks:
+        return
+    ensure_space(pdf, 70)
+    section(pdf, "PREDICTION / SCENARIO READ  -  candle behavior + indicators", AMBER)
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_text_color(40, 45, 50)
+    pdf.multi_cell(
+        0,
+        5,
+        S(
+            "Short-horizon scenario for the next 1-5 sessions. This is a rule-based probability read, "
+            "not a guaranteed forecast. Candle behavior uses today's DSE high/low/LTP with YCP as a proxy "
+            "when true open is unavailable."
+        ),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.ln(1)
+    headers = ["Code", "Prediction", "Prob", "Conf", "Candle", "Key explanation"]
+    widths = [22, 38, 16, 18, 34, 62]
+    rows = []
+    for r in picks[:8]:
+        pred = r["prediction"]
+        candle = pred.get("candle") or {}
+        label = pred.get("label")
+        col = GREEN if "BULLISH" in label else RED if ("BEARISH" in label or "RISK" in label) else AMBER
+        rows.append(
+            [
+                r["code"],
+                (label, col),
+                f"{pred.get('probability_pct')}%",
+                pred.get("confidence"),
+                candle.get("label", "-"),
+                "; ".join(pred.get("explanation", [])[:3]),
+            ]
+        )
+    table(pdf, headers, widths, ["L", "L", "R", "C", "L", "L"], rows)
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(*GREY)
+    pdf.multi_cell(
+        0,
+        4.8,
+        S("Prediction section is educational decision support only. Confirm with news, fundamentals, liquidity and official DSE data before trading."),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
 
 
 def methodology(pdf):
@@ -562,6 +642,8 @@ def methodology(pdf):
         "Cat B / N / Z  - weaker DSE category (Z = serious concern, irregular dividend).",
         "no div  - no recent cash dividend.",
         "Entry / Stop / Target  - dip-entry = day's low; stop = 5% below low; target = 52-week high.",
+        "Prediction  - next 1-5 session scenario from candle behavior, trend, RSI, SMA, volume and support/resistance; not a guarantee.",
+        "Candle behavior  - when true open is unavailable from live DSE scrape, YCP is used as an approximate session-open proxy.",
     ]:
         pdf.multi_cell(0, 5.5, S("- " + f), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
@@ -614,6 +696,7 @@ def build_pdf(data, port, when, investor=None, cash=0.0):
         pdf.add_page()
         cover(pdf, data, port, investor, cash)
         market_charts_section(pdf, data, tmpdir)
+        prediction_section(pdf, data)
 
         if port and port["positions"]:
             portfolio_section(pdf, port, cash, tmpdir)
