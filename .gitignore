@@ -2,6 +2,7 @@ data/cache/
 __pycache__/
 *.pyc
 .venv/
+.env
 /reports/*
 /data/portfolio.csv
 data/*.db

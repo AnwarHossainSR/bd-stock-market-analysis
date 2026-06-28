@@ -130,6 +130,35 @@ Additional insight endpoints:
 | POST | `/api/snapshot/capture` | capture live snapshot into SQLite |
 | POST | `/api/history/backfill?code=GP&start=2023-01-01` | backfill one code |
 
+## Telegram bot (optional)
+
+Run a small polling bot so Telegram can trigger the same local analysis pipeline:
+
+```powershell
+copy .env.example .env
+# edit .env and fill TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_CHAT_IDS
+.\run_telegram_bot.ps1
+```
+
+Bot commands:
+
+```text
+/id
+/health
+/analysis
+/analysis --buy 8 --watch 6 --cash 36600.98 --investor B10526
+```
+
+`/analysis` forces a fresh market fetch, builds the PDF report, sends a compact
+trade brief, then uploads the generated PDF. If you host the bot on a VPS and want it
+to pull the latest GitHub code before every analysis, set:
+
+```dotenv
+TELEGRAM_BOT_GIT_PULL=1
+```
+
+Keep the real `.env` local or in hosting secrets; never commit it to GitHub.
+
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:
