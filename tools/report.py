@@ -17,13 +17,23 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import re
+import shutil
+import tempfile
 from datetime import datetime
 
 from fpdf import FPDF
 
 from dse import get_prices, fetch, parse_company, COMPANY_URL, _rate, _pct_change
+import backtest
+import charts
+import fundamentals
+import indicators
+import patterns
+import score
+import store
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPORTS_DIR = os.path.join(ROOT, "reports")
@@ -79,8 +89,10 @@ def _div_yield(company, ltp):
 def enrich(row):
     code = row["code"]
     out = dict(row)
+    html = None
     try:
-        c = parse_company(fetch(COMPANY_URL.format(code=code), f"company_{code}", ttl=3600), code)
+        html = fetch(COMPANY_URL.format(code=code), f"company_{code}", ttl=3600)
+        c = parse_company(html, code)
     except Exception:
         c = {}
     out["pe"] = c.get("pe")
@@ -88,6 +100,41 @@ def enrich(row):
     out["sector"] = c.get("sector")
     out["range_52w"] = c.get("moving_range_52w")
     out["div_yield"] = _div_yield(c, row.get("ltp"))
+    out["score"] = None
+    out["signal"] = out.get("tag")
+    out["technical"] = None
+    out["fundamental"] = None
+    out["pattern_summary"] = None
+    out["indicators"] = {}
+    out["history"] = []
+
+    fscore = None
+    if html:
+        try:
+            more = fundamentals.parse_more(html, code)
+            f = {**c, **more}
+            f["pb"] = round(row.get("ltp") / f["nav"], 2) if f.get("nav") and row.get("ltp") else None
+            f["div_yield"] = out["div_yield"]
+            f["eps_positive"] = bool(f.get("eps_basic") and f.get("eps_basic") > 0)
+            hist_eps = f.get("eps_history") or []
+            f["eps_growth"] = bool(len(hist_eps) >= 2 and hist_eps[0] > hist_eps[-1])
+            fscore, _notes = fundamentals.fundamental_score(f)
+            out["fundamental"] = fscore
+        except Exception:
+            fscore = None
+
+    try:
+        h = store.history(code)
+        if len(h) >= 30:
+            ic = indicators.compute(h)
+            pt = patterns.analyze(h, ic)
+            comp = score.composite(out, ic, pt, fscore)
+            out.update(comp)
+            out["pattern_summary"] = pt["summary"]
+            out["indicators"] = ic
+            out["history"] = h
+    except Exception:
+        pass
     return out
 
 
@@ -115,12 +162,14 @@ def select(buy_n, watch_n):
     dec = sum(1 for x in rated if (x["pct"] or 0) < 0)
     regime = "BULLISH" if adv > dec * 1.5 else "BEARISH" if dec > adv * 1.5 else "MIXED"
 
-    buy = [r for r in rated if r["tag"] == "BUY-WATCH" and (r.get("value_mn") or 0) >= 5]
-    buy.sort(key=lambda r: r.get("value_mn") or 0, reverse=True)
-    buy = [enrich(r) for r in buy[:buy_n]]
+    buy_candidates = [r for r in rated if r["tag"] == "BUY-WATCH" and (r.get("value_mn") or 0) >= 5]
+    buy = [enrich(r) for r in buy_candidates]
+    buy.sort(key=lambda r: (r.get("score") is not None, r.get("score") or 0, r.get("value_mn") or 0), reverse=True)
+    buy = [r for r in buy if r.get("signal") in (None, "BUY", "WATCH", "BUY-WATCH")][:buy_n]
     watch = [r for r in rated if r["tag"] in ("WATCH-DIP", "WAIT") and (r.get("value_mn") or 0) >= 3]
     watch.sort(key=lambda r: r.get("value_mn") or 0, reverse=True)
     watch = [enrich(r) for r in watch[:watch_n]]
+    watch.sort(key=lambda r: (r.get("score") is not None, r.get("score") or 0, r.get("value_mn") or 0), reverse=True)
     avoid_all = [r for r in rated if r["tag"] == "AVOID"]
     crash = sorted([r for r in avoid_all if (r.get("value_mn") or 0) >= 0.5], key=lambda r: r.get("pct") or 0)
     notrade = [r for r in avoid_all if (r.get("value_mn") or 0) < 0.5]
@@ -150,13 +199,43 @@ def load_portfolio(path):
         mval = h["quantity"] * ltp if ltp is not None else None
         pnl = (mval - cost) if mval is not None else None
         invested += cost; market += mval or 0
+        meta = enrich(r) if r else {}
+        div_per_share = None
+        if meta.get("div_yield") and ltp:
+            div_per_share = meta["div_yield"] / 100 * ltp
         positions.append({**h, "ltp": ltp, "cost": cost, "mval": mval, "pnl": pnl,
                           "pnl_pct": (pnl / cost * 100) if pnl is not None and cost else None,
                           "day": _pct_change(r) if r else None,
-                          "tag": _rate(r)[0] if r else "NO-DATA",
-                          "sector": (enrich(r).get("sector") if r else None)})
+                          "tag": (meta.get("signal") or _rate(r)[0]) if r else "NO-DATA",
+                          "sector": meta.get("sector"), "div_per_share": div_per_share})
     return {"positions": positions, "invested": invested, "market": market,
             "pnl": market - invested, "ret": ((market - invested) / invested * 100) if invested else None}
+
+
+def portfolio_analytics(port):
+    total = port.get("market") or sum(p.get("mval") or 0 for p in port["positions"]) or 1
+    weights = sorted(
+        ((p["code"], round((p.get("mval") or 0) / total * 100, 1)) for p in port["positions"]),
+        key=lambda x: -x[1],
+    )
+    sectors = {}
+    for p in port["positions"]:
+        sector = p.get("sector") or "Unknown"
+        sectors[sector] = round(sectors.get(sector, 0) + (p.get("mval") or 0) / total * 100, 1)
+    income = sum((p.get("quantity") or 0) * (p.get("div_per_share") or 0) for p in port["positions"])
+    notes = []
+    if weights and weights[0][1] > 40:
+        notes.append(f"Concentrated: {weights[0][0]} is {weights[0][1]}% of book")
+    big_sector = max(sectors.items(), key=lambda x: x[1], default=(None, 0))
+    if big_sector[1] > 50:
+        notes.append(f"Sector heavy: {big_sector[0]} {big_sector[1]}%")
+    return {
+        "weights": weights,
+        "sectors": sectors,
+        "top_weight": weights[0] if weights else (None, 0),
+        "dividend_income": round(income, 2),
+        "notes": notes,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -253,6 +332,36 @@ def pnl_color(v):
 # --------------------------------------------------------------------------- #
 # Sections
 # --------------------------------------------------------------------------- #
+def ensure_space(pdf, needed=35):
+    if pdf.get_y() + needed > pdf.h - pdf.b_margin:
+        pdf.add_page()
+
+
+def _pdf_image(pdf, path, x=None, y=None, w=0, h=0):
+    try:
+        pdf.image(path, x=x, y=y, w=w, h=h)
+        return True
+    except Exception:
+        return False
+
+
+def market_charts_section(pdf, data, tmpdir):
+    try:
+        breadth = charts.breadth_bar(data.get("breadth", {}), os.path.join(tmpdir, "breadth.png"))
+        sectors = {}
+        for row in data.get("buy", []) + data.get("watch", []):
+            sectors[row.get("sector") or "Unknown"] = sectors.get(row.get("sector") or "Unknown", 0) + 1
+        sector = charts.sector_pie(sectors or {"No candidates": 1}, os.path.join(tmpdir, "sectors.png"))
+    except Exception:
+        return
+    ensure_space(pdf, 50)
+    section(pdf, "MARKET BREADTH & CANDIDATE MIX", NAVY2)
+    y = pdf.get_y()
+    if _pdf_image(pdf, breadth, x=pdf.l_margin, y=y, w=68):
+        _pdf_image(pdf, sector, x=pdf.l_margin + 84, y=y - 2, w=48)
+        pdf.set_y(y + 43)
+
+
 def cover(pdf, data, port, investor, cash):
     pdf.set_fill_color(*NAVY)
     pdf.rect(0, 0, pdf.w, 30, "F")
@@ -285,7 +394,7 @@ def cover(pdf, data, port, investor, cash):
         kpi_band(pdf, items[i:i + 4])
 
 
-def portfolio_section(pdf, port, cash):
+def portfolio_section(pdf, port, cash, tmpdir=None):
     section(pdf, "YOUR PORTFOLIO  -  live profit & loss", NAVY2)
     headers = ["Trading Code", "Qty", "Avg", "LTP", "Cost", "Mkt Value", "P&L", "P&L%", "Day%", "Signal"]
     widths = [30, 15, 17, 16, 24, 24, 22, 15, 13, 14]
@@ -324,9 +433,32 @@ def portfolio_section(pdf, port, cash):
         pdf.set_text_color(*RED)
         pdf.multi_cell(0, 5, S(f"Biggest drag: {worst['code']} {num(worst['pnl_pct'],1)}% - review thesis vs. average-down."),
                        new_x="LMARGIN", new_y="NEXT")
+    analytics = portfolio_analytics(port)
+    if tmpdir:
+        try:
+            alloc = charts.portfolio_alloc(port["positions"], os.path.join(tmpdir, "portfolio.png"))
+            ensure_space(pdf, 58)
+            y = pdf.get_y() + 3
+            _pdf_image(pdf, alloc, x=pdf.l_margin, y=y, w=52)
+            pdf.set_xy(pdf.l_margin + 62, y + 2)
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*NAVY)
+            pdf.cell(0, 5, "Portfolio analytics", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(40, 45, 50)
+            lines = [
+                f"Top weight: {analytics['top_weight'][0] or '-'} {analytics['top_weight'][1]}%",
+                f"Expected dividend income: Tk {money(analytics['dividend_income'])}",
+            ] + analytics["notes"]
+            for line in lines:
+                pdf.set_x(pdf.l_margin + 62)
+                pdf.multi_cell(0, 5, S(line), new_x="LMARGIN", new_y="NEXT")
+            pdf.set_y(max(pdf.get_y(), y + 50))
+        except Exception:
+            pass
 
 
-def candidate_block(pdf, i, r, kind):
+def candidate_block(pdf, i, r, kind, tmpdir=None):
     lv = r.get("levels") or _levels(r)
     pct = r.get("pct") or 0
     pdf.set_font("Helvetica", "B", 10)
@@ -351,6 +483,30 @@ def candidate_block(pdf, i, r, kind):
     pdf.multi_cell(0, 4.6, S(meta), new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(40, 45, 50)
     pdf.multi_cell(0, 4.6, S(f"Why: {r.get('reason','')}"), new_x="LMARGIN", new_y="NEXT")
+    if r.get("score") is not None:
+        sig_color = GREEN if r.get("signal") == "BUY" else AMBER if r.get("signal") == "WATCH" else GREY
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*sig_color)
+        fund = r.get("fundamental") if r.get("fundamental") is not None else "-"
+        pdf.multi_cell(
+            0,
+            4.6,
+            S(f"Score {r.get('score')}/100   tech {r.get('technical')}   fund {fund}   {r.get('signal')}"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+    if tmpdir and r.get("history"):
+        try:
+            png = charts.price_chart(r["history"], r.get("indicators") or {}, os.path.join(tmpdir, f"{r['code']}_{i}.png"))
+            ensure_space(pdf, 45)
+            _pdf_image(pdf, png, w=95)
+            pdf.ln(1)
+        except Exception:
+            pass
+    if r.get("pattern_summary"):
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(40, 45, 50)
+        pdf.multi_cell(0, 4.6, S(f"Pattern: {r['pattern_summary']}"), new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(*NAVY)
     if kind == "buy":
         plan = (f"Plan: entry on dip {num(lv['support'])} or break above {num(lv['resistance'])}.  "
@@ -376,7 +532,7 @@ def avoid_section(pdf, avoid):
 
 
 def methodology(pdf):
-    pdf.add_page()
+    ensure_space(pdf, 90)
     section(pdf, "HOW SHARES ARE PICKED  (methodology)", NAVY2)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(40, 45, 50)
@@ -416,42 +572,78 @@ def methodology(pdf):
         new_x="LMARGIN", new_y="NEXT")
 
 
+def backtest_section(pdf):
+    path = os.path.join(REPORTS_DIR, "backtest.json")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return
+    ensure_space(pdf, 55)
+    section(pdf, "BACKTEST VALIDATION", NAVY2)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(40, 45, 50)
+    pdf.multi_cell(
+        0,
+        5,
+        S(
+            f"Cached walk-forward validation over stored history. Horizon: {data.get('horizon', '-')}"
+            " trading days. Past signal behavior is measurement, not prediction."
+        ),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    rows = []
+    for sig, val in sorted((data.get("by_signal") or {}).items()):
+        rows.append([sig, val.get("n", 0), f"{val.get('win_rate', 0)}%", f"{val.get('avg_ret', 0)}%"])
+    if rows:
+        table(pdf, ["Signal", "N", "Win Rate", "Avg Return"], [45, 30, 45, 45], ["L", "R", "R", "R"], rows)
+
+
 # --------------------------------------------------------------------------- #
 # Build
 # --------------------------------------------------------------------------- #
 def build_pdf(data, port, when, investor=None, cash=0.0):
     os.makedirs(REPORTS_DIR, exist_ok=True)
+    tmpdir = tempfile.mkdtemp(prefix="dse_report_")
     pdf = Report()
     pdf.set_auto_page_break(auto=True, margin=16)
-    pdf.add_page()
-    cover(pdf, data, port, investor, cash)
+    try:
+        pdf.add_page()
+        cover(pdf, data, port, investor, cash)
+        market_charts_section(pdf, data, tmpdir)
 
-    if port and port["positions"]:
-        portfolio_section(pdf, port, cash)
+        if port and port["positions"]:
+            portfolio_section(pdf, port, cash, tmpdir)
 
-    section(pdf, "BUY CANDIDATES  -  momentum on volume", GREEN)
-    if data["buy"]:
-        for i, r in enumerate(data["buy"], 1):
-            candidate_block(pdf, i, r, "buy")
-    else:
-        pdf.set_font("Helvetica", "I", 9); pdf.set_text_color(*GREY)
-        pdf.multi_cell(0, 6, "No clean buy setups today. Stay patient.", new_x="LMARGIN", new_y="NEXT")
+        section(pdf, "BUY CANDIDATES  -  composite score + pattern read", GREEN)
+        if data["buy"]:
+            for i, r in enumerate(data["buy"], 1):
+                candidate_block(pdf, i, r, "buy", tmpdir)
+        else:
+            pdf.set_font("Helvetica", "I", 9); pdf.set_text_color(*GREY)
+            pdf.multi_cell(0, 6, "No clean buy setups today. Stay patient.", new_x="LMARGIN", new_y="NEXT")
 
-    section(pdf, "WATCHLIST  -  wait for the right entry", NAVY)
-    if data["watch"]:
-        for i, r in enumerate(data["watch"], 1):
-            candidate_block(pdf, i, r, "watch")
-    else:
-        pdf.set_font("Helvetica", "I", 9); pdf.set_text_color(*GREY)
-        pdf.multi_cell(0, 6, "Nothing on watch today.", new_x="LMARGIN", new_y="NEXT")
+        section(pdf, "WATCHLIST  -  wait for the right entry", NAVY)
+        if data["watch"]:
+            for i, r in enumerate(data["watch"], 1):
+                candidate_block(pdf, i, r, "watch", tmpdir)
+        else:
+            pdf.set_font("Helvetica", "I", 9); pdf.set_text_color(*GREY)
+            pdf.multi_cell(0, 6, "Nothing on watch today.", new_x="LMARGIN", new_y="NEXT")
 
-    avoid_section(pdf, data["avoid"])
-    methodology(pdf)
+        avoid_section(pdf, data["avoid"])
+        backtest_section(pdf)
+        methodology(pdf)
 
-    fname = f"DSE_Analysis_{when.strftime('%Y-%m-%d_%H%M')}_BDT.pdf"
-    path = os.path.join(REPORTS_DIR, fname)
-    pdf.output(path)
-    return path
+        fname = f"DSE_Analysis_{when.strftime('%Y-%m-%d_%H%M')}_BDT.pdf"
+        path = os.path.join(REPORTS_DIR, fname)
+        pdf.output(path)
+        return path
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def main():

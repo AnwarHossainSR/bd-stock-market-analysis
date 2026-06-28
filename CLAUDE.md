@@ -4,6 +4,14 @@ Multi-agent system for analysing **Dhaka Stock Exchange (DSE)** stocks and the u
 portfolio. Data is scraped from the public `dsebd.org` site (no API key, delayed/EOD).
 
 ## Layout
+New accuracy-engine modules:
+- `tools/store.py`, `tools/history.py`, `tools/snapshot.py` - SQLite OHLC store,
+  archive backfill, and daily live snapshot capture.
+- `tools/indicators.py`, `tools/patterns.py`, `tools/fundamentals.py`, `tools/score.py`,
+  `tools/backtest.py`, `tools/charts.py` - history-backed indicators, pattern reads,
+  deeper fundamentals, composite scoring, validation, and PDF chart PNGs.
+- `tools/refresh.py` - daily snapshot + cached backtest JSON for report validation.
+
 - `tools/dse.py` — data backbone (scraper CLI, JSON output). All agents call this.
 - `tools/report.py` — scans all shares → PDF report (buy + watchlist + conditions).
 - `api/` — thin FastAPI layer over `tools/` (no DB). Reuses dse + report; nothing duplicated.
@@ -30,14 +38,18 @@ run non-interactive, no activation). Never bare `python`.
 .venv/Scripts/python tools/dse.py index                              # breadth, gainers/losers
 .venv/Scripts/python tools/dse.py screen --limit 15                  # BUY/HOLD/WAIT/AVOID tags
 .venv/Scripts/python tools/dse.py portfolio data/portfolio.csv       # live P&L + per-holding tag
+.venv/Scripts/python tools/history.py --code GP --start 2023-01-01   # backfill one code
+.venv/Scripts/python tools/history.py --all --start 2023-01-01       # backfill market history
+.venv/Scripts/python tools/refresh.py                                # snapshot + reports/backtest.json
 ```
 
 ## Report generator
 ```
 .venv/Scripts/python tools/report.py --buy 6 --watch 6   # -> reports/DSE_Analysis_*.pdf
 ```
-Scans all shares, picks BUY + WATCHLIST with entry/stop/target + fundamentals, flags
-HIGH P/E and Cat B/N/Z risk. Prints the saved PDF path.
+Scans all shares, picks BUY + WATCHLIST with entry/stop/target + fundamentals, scores,
+pattern reads, embedded price/breadth/allocation charts, and cached backtest validation.
+Prints the saved PDF path.
 
 ## REST API (optional HTTP layer)
 ```
@@ -47,7 +59,8 @@ All-in-one: `GET /api/analysis?buy=&watch=&cash=&investor=&pdf=true` → market 
 (buy/watch/avoid) + portfolio P&L + PDF url in one response (mirrors the `/analysis` chain).
 Granular endpoints reuse `tools/`: `GET /api/health|prices|quote?codes=|company?code=|
 index|overview?buy=&watch=|portfolio`, `GET /api/report?...` (→ PDF url), `GET /reports/{file}`.
-No DB; portfolio still from `data/portfolio.csv`.
+Portfolio still from `data/portfolio.csv`. Insight endpoints add history, indicators,
+patterns, score, backtest, snapshot capture, and historical backfill over the SQLite store.
 
 ## /analysis command
 `.claude/commands/analysis.md` → `/analysis [TICKER]`. Generates the PDF report, then

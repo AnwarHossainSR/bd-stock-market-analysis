@@ -16,8 +16,40 @@ if TOOLS not in sys.path:
 
 import dse  # noqa: E402  (tools/dse.py)
 import report  # noqa: E402  (tools/report.py)
+import store  # noqa: E402
+import indicators  # noqa: E402
+import patterns  # noqa: E402
+import fundamentals  # noqa: E402
+import score  # noqa: E402
+import backtest  # noqa: E402
+import snapshot  # noqa: E402
+import history  # noqa: E402
+import session  # noqa: E402
+import portfolio_actions  # noqa: E402
+import alerts  # noqa: E402
+import intraday  # noqa: E402
+import health  # noqa: E402
 
 REPORTS_DIR = os.path.join(ROOT, "reports")
 PORTFOLIO_CSV = os.path.join(ROOT, "data", "portfolio.csv")
 
-__all__ = ["dse", "report", "ROOT", "REPORTS_DIR", "PORTFOLIO_CSV"]
+__all__ = [
+    "dse",
+    "report",
+    "store",
+    "indicators",
+    "patterns",
+    "fundamentals",
+    "score",
+    "backtest",
+    "snapshot",
+    "history",
+    "session",
+    "portfolio_actions",
+    "alerts",
+    "intraday",
+    "health",
+    "ROOT",
+    "REPORTS_DIR",
+    "PORTFOLIO_CSV",
+]

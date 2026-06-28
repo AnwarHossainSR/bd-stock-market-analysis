@@ -55,7 +55,7 @@ def _cache_path(key: str) -> str:
     return os.path.join(CACHE_DIR, safe + ".html")
 
 
-def _get(url: str) -> requests.Response:
+def _get_legacy(url: str) -> requests.Response:
     """GET that tolerates dsebd.org's incomplete TLS chain.
 
     The site is public and unauthenticated (no credentials/cookies are sent),
@@ -73,6 +73,35 @@ def _get(url: str) -> requests.Response:
         print("warning: dsebd.org TLS chain incomplete — retrying without verification "
               "(public data, no credentials sent)", file=sys.stderr)
         return requests.get(url, headers=headers, timeout=30, verify=False)
+
+
+def _get(url: str) -> requests.Response:
+    """GET with retry/backoff and a TLS-insecure fallback for public DSE pages."""
+    headers = {"User-Agent": UA}
+    last_exc = None
+    for attempt in range(2):
+        try:
+            return requests.get(url, headers=headers, timeout=30)
+        except requests.exceptions.SSLError as exc:
+            last_exc = exc
+            if os.environ.get("DSE_INSECURE") == "0":
+                raise
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            print(
+                "warning: dsebd.org TLS chain incomplete - retrying without verification "
+                "(public data, no credentials sent)",
+                file=sys.stderr,
+            )
+            try:
+                return requests.get(url, headers=headers, timeout=30, verify=False)
+            except requests.RequestException as exc2:
+                last_exc = exc2
+        except requests.RequestException as exc:
+            last_exc = exc
+        if attempt == 0:
+            time.sleep(1)
+    raise requests.RequestException(f"GET failed after 2 attempts for {url}: {last_exc}")
 
 
 def fetch(url: str, key: str, ttl: int = CACHE_TTL) -> str:

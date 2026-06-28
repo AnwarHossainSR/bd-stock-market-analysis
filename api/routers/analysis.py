@@ -21,7 +21,7 @@ def analysis(
     cash: float = Query(0.0, ge=0),
     investor: str | None = Query(None),
     pdf: bool = Query(True, description="also build the PDF report"),
-):
+) -> dict:
     rows = dse.get_prices()
     slim = lambda r: {"code": r["code"], "ltp": r["ltp"],
                       "pct_change": dse._pct_change(r), "value_mn": r["value_mn"]}

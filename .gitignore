@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 /reports/*
 /data/portfolio.csv
+data/*.db
