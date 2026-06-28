@@ -130,34 +130,6 @@ Additional insight endpoints:
 | POST | `/api/snapshot/capture` | capture live snapshot into SQLite |
 | POST | `/api/history/backfill?code=GP&start=2023-01-01` | backfill one code |
 
-## React trading dashboard
-
-The local dashboard shows the live-session action sheet, portfolio actions, auto
-buy-watch names, avoid/chase warnings, alerts, data health, reports, and saved
-analysis runs.
-
-```bash
-bun install --cwd client
-bun run dev
-```
-
-Open:
-
-- UI: `http://127.0.0.1:5173`
-- API docs: `http://127.0.0.1:8000/docs`
-
-Useful commands:
-
-```bash
-bun run test          # Python API/tool tests + React tests
-bun run test:api      # Python only
-bun run test:client   # React only
-bun run build         # production frontend build
-```
-
-The frontend lives in `client/`; the FastAPI backend stays in `api/` and `tools/`.
-The root `bun run dev` command starts both for local trading-desk use.
-
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:
