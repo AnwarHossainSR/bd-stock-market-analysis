@@ -187,6 +187,25 @@ Just ask in natural language and the orchestrator routes the work, e.g.:
 - *"Give me a DSE market brief"*
 - *"Is SQURPHARMA expensive right now?"* → fundamentals-analyst
 
+## Using analysis inside Codex
+
+Claude slash commands live under `.claude/commands/`, so Codex does not automatically
+execute them as Claude commands. This repo includes Codex guidance for the same workflow:
+
+- `AGENTS.md` tells Codex what to do when you type `/analysis` or ask to run analysis.
+- `.codex/skills/dse-analysis/SKILL.md` contains the reusable Codex skill workflow.
+
+In a new Codex session, use one of these prompts:
+
+```text
+/analysis
+run analysis
+use dse-analysis
+```
+
+If your Codex UI treats unknown slash commands as UI shortcuts instead of sending them
+to the assistant, use `run analysis` or `use dse-analysis`.
+
 ## Notes / limitations
 
 - Indicators need stored history. Run `tools/history.py` once, then `tools/refresh.py`

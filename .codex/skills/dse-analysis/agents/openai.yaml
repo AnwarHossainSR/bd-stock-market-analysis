@@ -1,0 +1,3 @@
+display_name: "DSE Analysis"
+short_description: "Run DSE analysis and Bangla PDF reports"
+default_prompt: "Run DSE analysis for this repo, write Codex commentary when appropriate, and generate the Bangla PDF report."
