@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from datetime import datetime
 
@@ -811,6 +812,33 @@ def prediction_section(pdf, data):
     )
 
 
+def ai_prediction_section(pdf, text):
+    if not text:
+        return
+    ensure_space(pdf, 60)
+    section(pdf, "AI Prediction - Claude/Codex ব্যাখ্যা", AMBER)
+    doc_font(pdf, "", 8.8)
+    pdf.set_text_color(35, 40, 45)
+    clean = str(text).strip()
+    clean = re.sub(r"\n{3,}", "\n\n", clean)
+    for block in clean.splitlines():
+        line = block.strip()
+        if not line:
+            pdf.ln(1.5)
+            continue
+        if len(line) <= 38 and (line.endswith(":") or line.lower() == "ai prediction"):
+            ensure_space(pdf, 12)
+            doc_font(pdf, "B", 9)
+            pdf.set_text_color(*NAVY)
+            pdf.multi_cell(0, 5.2, S(line), new_x="LMARGIN", new_y="NEXT")
+            doc_font(pdf, "", 8.8)
+            pdf.set_text_color(35, 40, 45)
+            continue
+        ensure_space(pdf, 14)
+        pdf.multi_cell(0, 5.2, S(line), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+
+
 def methodology(pdf):
     ensure_space(pdf, 90)
     section(pdf, "শেয়ার কীভাবে বাছাই করা হয় (মেথডোলজি)", NAVY2)
@@ -887,7 +915,7 @@ def backtest_section(pdf):
 # --------------------------------------------------------------------------- #
 # Build
 # --------------------------------------------------------------------------- #
-def build_pdf(data, port, when, investor=None, cash=0.0):
+def build_pdf(data, port, when, investor=None, cash=0.0, ai_text=None):
     os.makedirs(REPORTS_DIR, exist_ok=True)
     tmpdir = tempfile.mkdtemp(prefix="dse_report_")
     pdf = Report()
@@ -904,6 +932,7 @@ def build_pdf(data, port, when, investor=None, cash=0.0):
         executive_summary(pdf, data, port)
         market_charts_section(pdf, data, tmpdir)
         prediction_section(pdf, data)
+        ai_prediction_section(pdf, ai_text)
 
         if port and port["positions"]:
             portfolio_section(pdf, port, cash, tmpdir)
@@ -943,12 +972,20 @@ def main():
     p.add_argument("--portfolio", default=os.path.join("data", "portfolio.csv"))
     p.add_argument("--cash", type=float, default=0.0, help="ledger/cash balance for total equity")
     p.add_argument("--investor", default=None, help="investor code shown on the cover")
+    p.add_argument("--ai-commentary-file", default=None, help="optional Claude/Codex-written Bangla commentary file to embed in the PDF")
+    p.add_argument("--ai-commentary-stdin", action="store_true", help="read optional Claude/Codex commentary from stdin")
     args = p.parse_args()
 
     when = datetime.now()
     data = select(args.buy, args.watch)
     port = load_portfolio(args.portfolio)
-    path = build_pdf(data, port, when, investor=args.investor, cash=args.cash)
+    ai_text = None
+    if args.ai_commentary_file:
+        with open(args.ai_commentary_file, encoding="utf-8") as f:
+            ai_text = f.read().strip()
+    elif args.ai_commentary_stdin:
+        ai_text = sys.stdin.read().strip()
+    path = build_pdf(data, port, when, investor=args.investor, cash=args.cash, ai_text=ai_text)
     print(path)
 
 

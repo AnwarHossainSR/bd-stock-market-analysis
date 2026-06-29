@@ -159,6 +159,25 @@ TELEGRAM_BOT_GIT_PULL=1
 
 Keep the real `.env` local or in hosting secrets; never commit it to GitHub.
 
+### AI Prediction in PDF
+
+The codebase does not call any LLM API. When you run analysis inside Claude Code or
+Codex, the assistant can write its own Bangla commentary to a local file and pass it
+into the PDF generator:
+
+```powershell
+.venv/Scripts/python tools/report.py --buy 6 --watch 6 --investor B10526 --ai-commentary-file reports/ai_commentary_latest.md
+```
+
+You can also pipe commentary through stdin:
+
+```powershell
+Get-Content reports/ai_commentary_latest.md | .venv/Scripts/python tools/report.py --ai-commentary-stdin
+```
+
+Telegram `/analysis` stays rule-based only. It generates the PDF from scraper/rule data
+without Claude/Codex commentary.
+
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:
