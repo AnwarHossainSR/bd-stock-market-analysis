@@ -815,28 +815,177 @@ def prediction_section(pdf, data):
 def ai_prediction_section(pdf, text):
     if not text:
         return
-    ensure_space(pdf, 60)
+    ensure_space(pdf, 72)
     section(pdf, "AI Prediction - Claude/Codex ব্যাখ্যা", AMBER)
-    doc_font(pdf, "", 8.8)
-    pdf.set_text_color(35, 40, 45)
-    clean = str(text).strip()
-    clean = re.sub(r"\n{3,}", "\n\n", clean)
-    for block in clean.splitlines():
-        line = block.strip()
-        if not line:
-            pdf.ln(1.5)
+
+    rows = parse_ai_commentary(text)
+    if not rows:
+        return
+
+    doc_font(pdf, "", 8)
+    pdf.set_text_color(80, 88, 96)
+    pdf.multi_cell(
+        0,
+        4.6,
+        S("Codex/Claude commentary - rule-engine data, portfolio file এবং latest scrape-এর উপর ভিত্তি করে। এটি buy/sell command নয়।"),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.ln(1.5)
+
+    left = pdf.l_margin
+    width = pdf.w - pdf.l_margin - pdf.r_margin
+    label_w = 38
+    gap = 3
+    pad_x = 3
+    pad_y = 3
+    body_w = width - label_w - gap - (pad_x * 3)
+    line_h = 4.65
+
+    for idx, (label, body) in enumerate(rows):
+        label = ai_label_bn(label)
+        body = compact_ai_text(body)
+        if not body:
             continue
-        if len(line) <= 38 and (line.endswith(":") or line.lower() == "ai prediction"):
-            ensure_space(pdf, 12)
-            doc_font(pdf, "B", 9)
-            pdf.set_text_color(*NAVY)
-            pdf.multi_cell(0, 5.2, S(line), new_x="LMARGIN", new_y="NEXT")
-            doc_font(pdf, "", 8.8)
-            pdf.set_text_color(35, 40, 45)
-            continue
-        ensure_space(pdf, 14)
-        pdf.multi_cell(0, 5.2, S(line), new_x="LMARGIN", new_y="NEXT")
+
+        doc_font(pdf, "", 8.4)
+        body_lines = pdf.multi_cell(
+            body_w,
+            line_h,
+            S(body),
+            dry_run=True,
+            output="LINES",
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+        doc_font(pdf, "B", 8.2)
+        label_lines = pdf.multi_cell(
+            label_w - (pad_x * 2),
+            line_h,
+            S(label),
+            dry_run=True,
+            output="LINES",
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+        row_h = max(14, (max(len(body_lines), len(label_lines)) * line_h) + (pad_y * 2))
+        ensure_space(pdf, row_h + 5)
+
+        x = left
+        y = pdf.get_y()
+        fill = (255, 250, 239) if idx % 2 == 0 else (247, 250, 252)
+        pdf.set_fill_color(*fill)
+        pdf.set_draw_color(226, 232, 238)
+        pdf.rect(x, y, width, row_h, style="DF")
+
+        pdf.set_fill_color(*AMBER)
+        pdf.rect(x, y, 1.8, row_h, style="F")
+
+        doc_font(pdf, "B", 8.2)
+        pdf.set_text_color(*NAVY)
+        pdf.set_xy(x + pad_x, y + pad_y)
+        pdf.multi_cell(
+            label_w - (pad_x * 2),
+            line_h,
+            S(label),
+            border=0,
+            new_x="RIGHT",
+            new_y="TOP",
+        )
+
+        doc_font(pdf, "", 8.4)
+        pdf.set_text_color(35, 40, 45)
+        pdf.set_xy(x + label_w + gap, y + pad_y)
+        pdf.multi_cell(
+            body_w,
+            line_h,
+            S(body),
+            border=0,
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+        pdf.set_y(y + row_h + 2)
+
     pdf.ln(1)
+
+
+def parse_ai_commentary(text):
+    clean = str(text or "").strip()
+    clean = repair_mojibake(clean)
+    clean = re.sub(r"\r\n?", "\n", clean)
+    clean = re.sub(r"\n{3,}", "\n\n", clean)
+
+    rows = []
+    current_label = None
+    current_body = []
+    label_re = re.compile(
+        r"^(Market View|Best Setups|Portfolio View|Risk\s*/\s*Avoid|Next\s*1\s*-\s*5\s*Sessions|Action Discipline)\s*:\s*(.*)$",
+        re.I,
+    )
+
+    def flush():
+        nonlocal current_label, current_body
+        if current_label and current_body:
+            rows.append((current_label, " ".join(x.strip() for x in current_body if x.strip())))
+        current_label = None
+        current_body = []
+
+    for raw in clean.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.lower() in {"ai prediction", "# ai prediction", "## ai prediction"}:
+            continue
+        line = re.sub(r"^[-*]\s+", "", line)
+        match = label_re.match(line)
+        if match:
+            flush()
+            current_label = match.group(1)
+            current_body = [match.group(2).strip()]
+        elif current_label:
+            current_body.append(line)
+        else:
+            rows.append(("Summary", line))
+    flush()
+
+    if rows:
+        return rows
+
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", clean) if p.strip()]
+    return [("Summary", p) for p in paragraphs[:6]]
+
+
+def ai_label_bn(label):
+    key = re.sub(r"\s+", " ", (label or "").strip().lower())
+    return {
+        "market view": "মার্কেট ভিউ",
+        "best setups": "সেরা সেটআপ",
+        "portfolio view": "পোর্টফোলিও ভিউ",
+        "risk / avoid": "রিস্ক / এড়ানো",
+        "risk/avoid": "রিস্ক / এড়ানো",
+        "next 1-5 sessions": "পরবর্তী ১-৫ সেশন",
+        "action discipline": "অ্যাকশন ডিসিপ্লিন",
+        "summary": "সারাংশ",
+    }.get(key, label or "সারাংশ")
+
+
+def compact_ai_text(text):
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    text = text.replace("। ", "।  ")
+    return text
+
+
+def repair_mojibake(text):
+    raw = str(text or "")
+    if not any(mark in raw for mark in ("à¦", "à§", "Ã")):
+        return raw
+    try:
+        fixed = raw.encode("latin-1").decode("utf-8")
+    except UnicodeError:
+        return raw
+    bangla_before = sum(0x0980 <= ord(ch) <= 0x09FF for ch in raw)
+    bangla_after = sum(0x0980 <= ord(ch) <= 0x09FF for ch in fixed)
+    return fixed if bangla_after > bangla_before else raw
 
 
 def methodology(pdf):
