@@ -40,7 +40,7 @@ import report  # noqa: E402
 def load_dotenv(path: Path = ROOT / ".env") -> None:
     if not path.exists():
         return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -240,7 +240,7 @@ def poll():
     if not TOKEN:
         raise SystemExit("Set TELEGRAM_BOT_TOKEN first.")
     offset = None
-    print("Telegram bot started. Press Ctrl+C to stop.")
+    print("Telegram bot started. Press Ctrl+C to stop.", flush=True)
     while True:
         params = {"timeout": 50}
         if offset is not None:
@@ -258,7 +258,8 @@ def poll():
                 if message:
                     handle_message(message)
         except KeyboardInterrupt:
-            raise
+            print("\nTelegram bot stopped.", flush=True)
+            return
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
             if status == 409:
@@ -272,4 +273,7 @@ def poll():
 
 
 if __name__ == "__main__":
-    poll()
+    try:
+        poll()
+    except KeyboardInterrupt:
+        print("\nTelegram bot stopped.", flush=True)

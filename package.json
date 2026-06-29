@@ -1,0 +1,9 @@
+{
+  "name": "market-analysis",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "bot": "bash ./run_telegram_bot.sh"
+  }
+}
