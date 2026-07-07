@@ -130,6 +130,54 @@ Additional insight endpoints:
 | POST | `/api/snapshot/capture` | capture live snapshot into SQLite |
 | POST | `/api/history/backfill?code=GP&start=2023-01-01` | backfill one code |
 
+## Telegram bot (optional)
+
+Run a small polling bot so Telegram can trigger the same local analysis pipeline:
+
+```powershell
+copy .env.example .env
+# edit .env and fill TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_CHAT_IDS
+.\run_telegram_bot.ps1
+```
+
+Bot commands:
+
+```text
+/id
+/health
+/analysis
+/analysis --buy 8 --watch 6 --cash 36600.98 --investor B10526
+```
+
+`/analysis` forces a fresh market fetch, builds the PDF report, sends a compact
+trade brief, then uploads the generated PDF. If you host the bot on a VPS and want it
+to pull the latest GitHub code before every analysis, set:
+
+```dotenv
+TELEGRAM_BOT_GIT_PULL=1
+```
+
+Keep the real `.env` local or in hosting secrets; never commit it to GitHub.
+
+### AI Prediction in PDF
+
+The codebase does not call any LLM API. When you run analysis inside Claude Code or
+Codex, the assistant can write its own Bangla commentary to a local file and pass it
+into the PDF generator:
+
+```powershell
+.venv/Scripts/python tools/report.py --buy 6 --watch 6 --investor B10526 --ai-commentary-file reports/ai_commentary_latest.md
+```
+
+You can also pipe commentary through stdin:
+
+```powershell
+Get-Content reports/ai_commentary_latest.md | .venv/Scripts/python tools/report.py --ai-commentary-stdin
+```
+
+Telegram `/analysis` stays rule-based only. It generates the PDF from scraper/rule data
+without Claude/Codex commentary.
+
 ## Using the agents (inside Claude Code)
 
 Just ask in natural language and the orchestrator routes the work, e.g.:
@@ -138,6 +186,25 @@ Just ask in natural language and the orchestrator routes the work, e.g.:
 - *"Review my portfolio and flag the risks"*
 - *"Give me a DSE market brief"*
 - *"Is SQURPHARMA expensive right now?"* → fundamentals-analyst
+
+## Using analysis inside Codex
+
+Claude slash commands live under `.claude/commands/`, so Codex does not automatically
+execute them as Claude commands. This repo includes Codex guidance for the same workflow:
+
+- `AGENTS.md` tells Codex what to do when you type `/analysis` or ask to run analysis.
+- `.codex/skills/dse-analysis/SKILL.md` contains the reusable Codex skill workflow.
+
+In a new Codex session, use one of these prompts:
+
+```text
+/analysis
+run analysis
+use dse-analysis
+```
+
+If your Codex UI treats unknown slash commands as UI shortcuts instead of sending them
+to the assistant, use `run analysis` or `use dse-analysis`.
 
 ## Notes / limitations
 
